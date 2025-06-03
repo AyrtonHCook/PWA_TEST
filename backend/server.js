@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const path = require('path');
+require('dotenv').config();
 
 const app = express();
 const port = 3000;
@@ -9,13 +10,9 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL connection
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'PWAtest',
-  password: '0928244247',
-  port: 5432,
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
 app.use(express.static(path.join(__dirname, '../public')));
