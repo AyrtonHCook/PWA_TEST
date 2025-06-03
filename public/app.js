@@ -1,4 +1,4 @@
-const API_URL = '/api/data';
+const API_URL = 'https://pwatest-production.up.railway.app/api/data';
 
 // Open IndexedDB
 const dbPromise = idb.openDB('offline-db', 1, {
