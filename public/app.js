@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000/api/data';
+const API_URL = '/api/data';
 
 // Open IndexedDB
 const dbPromise = idb.openDB('offline-db', 1, {
