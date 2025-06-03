@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple PWA with DB</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+<body>
+  <h1>Simple PWA with Postgres</h1>
+
+  <form id="dataForm">
+    <input type="text" id="nameInput" placeholder="Enter name">
+    <button type="submit">Add</button>
+  </form>
+
+  <div id="status" style="color: green; margin-top: 10px;"></div>
+
+  <ul id="dataList"></ul>
+
+  <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
