@@ -5,7 +5,7 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -15,31 +15,39 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-app.use(express.static(path.join(__dirname, '../public')));
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error(' Failed to connect to database:', err);
+  } else {
+    console.log(' Successfully connected to database at:', res.rows[0].now);
+  }
+});
 
-// Simple GET endpoint to fetch data
+app.use(express.static(path.join(__dirname, 'public')));
+
+// GET endpoint
 app.get('/api/data', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, name FROM demo');
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    console.error('Database error:', err.stack);
     res.status(500).send('Server error');
   }
 });
 
-// Simple POST endpoint to insert data
+// POST endpoint
 app.post('/api/data', async (req, res) => {
   const { name } = req.body;
   try {
     await pool.query('INSERT INTO demo (name) VALUES ($1)', [name]);
     res.send('Inserted');
   } catch (err) {
-    console.error(err);
+    console.error('Database error:', err.stack);
     res.status(500).send('Server error');
   }
 });
 
 app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+  console.log(`Server running on port ${port}`);
 });
