@@ -1,54 +1,57 @@
-const API_URL = '/api/data';
+// -------------------- API ENDPOINT --------------------
+const PROFILES_API_URL = '/api/profiles';
 
-// Open IndexedDB
+// -------------------- IndexedDB Setup --------------------
 const dbPromise = idb.openDB('offline-db', 1, {
   upgrade(db) {
     db.createObjectStore('pending', { autoIncrement: true });
   }
 });
 
-// -------------------- Utility Functions --------------------
-
-// Show temporary status message
+// -------------------- Utility --------------------
 function showMessage(msg) {
   const status = document.getElementById('status');
-  status.textContent = msg;
-  setTimeout(() => { status.textContent = ""; }, 3000);
-}
-
-// -------------------- Backend API Calls --------------------
-
-// Load data from backend and display in UI
-async function loadData() {
-  try {
-    const res = await fetch(API_URL);
-    const data = await res.json();
-    renderDataList(data);
-  } catch (err) {
-    console.warn('Failed to load data from server', err);
+  if (status) {
+    status.textContent = msg;
+    setTimeout(() => { status.textContent = ""; }, 3000);
   }
 }
 
-// Send data to backend server
-async function sendToServer(name) {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name })
-  });
-  if (!response.ok) throw new Error('Server error');
+// -------------------- Load Profiles --------------------
+async function loadProfiles() {
+  try {
+    const res = await fetch(PROFILES_API_URL);
+    const data = await res.json();
+
+    const container = document.getElementById("profiles-container");
+    container.innerHTML = '';
+
+    data.forEach(profile => {
+      const card = document.createElement("div");
+      card.className = "profile-card";
+
+      card.innerHTML = `
+        <h3>${profile.name}</h3>
+        <p><strong>Skills:</strong> ${profile.skills ? profile.skills.join(", ") : ''}</p>
+        <p><strong>Languages:</strong> ${profile.languages ? profile.languages.join(", ") : ''}</p>
+        <p><strong>Reputation:</strong> ${profile.reputation_points}</p>
+      `;
+
+      container.appendChild(card);
+    });
+
+  } catch (err) {
+    console.error("Failed to load profiles:", err);
+  }
 }
 
-// -------------------- Offline Handling --------------------
-
-// Save data to IndexedDB if POST fails
-async function saveOffline(name) {
+// -------------------- Offline Handling (ready for write logic later) --------------------
+async function saveOffline(data) {
   const db = await dbPromise;
-  await db.add('pending', { name });
-  console.log('Saved offline:', name);
+  await db.add('pending', data);
+  console.log('Saved offline:', data);
 }
 
-// Sync offline data when back online
 async function syncPending() {
   const db = await dbPromise;
   const all = await db.getAll('pending');
@@ -57,62 +60,25 @@ async function syncPending() {
   let synced = 0;
   for (const item of all) {
     try {
-      await sendToServer(item.name);
-      console.log('Synced:', item.name);
+      // placeholder for future sync logic
+      console.log('Pending item found:', item);
       synced++;
     } catch {
-      console.warn('Failed to sync:', item.name);
-      continue;
+      console.warn('Failed to sync item:', item);
     }
   }
 
   if (synced > 0) {
-    showMessage(`Synced ${synced} items from offline queue.`);
+    showMessage(`Synced ${synced} pending items.`);
   }
   await db.clear('pending');
-  loadData();
 }
 
-// -------------------- UI Handling --------------------
-
-// Render data list in UI
-function renderDataList(data) {
-  const list = document.getElementById('dataList');
-  list.innerHTML = '';
-  data.forEach(item => {
-    const li = document.createElement('li');
-    li.textContent = item.name;
-    list.appendChild(li);
-  });
-}
-
-// -------------------- Event Listeners --------------------
-
-// Handle form submission
-document.getElementById('dataForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const nameInput = document.getElementById('nameInput');
-  const name = nameInput.value;
-
-  try {
-    await sendToServer(name);
-    showMessage("Saved successfully.");
-  } catch {
-    await saveOffline(name);
-    showMessage("Saved offline. Will sync when online.");
-  }
-
-  nameInput.value = '';
-  loadData();
-});
-
-// Sync on reconnect
+// -------------------- Events --------------------
 window.addEventListener('online', syncPending);
-
-// Sync and load data on page load
 window.addEventListener('load', () => {
+  loadProfiles();
   if (navigator.onLine) {
     syncPending();
   }
-  loadData();
 });

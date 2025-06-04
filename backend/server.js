@@ -4,11 +4,9 @@ const { Pool } = require('pg');
 const path = require('path');
 require('dotenv').config();
 
-// Initialize app
 const app = express();
 const port = process.env.PORT || 3000;
 
-// -------------------- Middlewares --------------------
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -16,11 +14,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // -------------------- Database Connection --------------------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Uncomment below if needed for production SSL
-  // ssl: { rejectUnauthorized: false }
+  // ssl: { rejectUnauthorized: false }  <-- uncomment for Railway deployment
 });
 
-// Test database connection
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('Failed to connect to database:', err);
@@ -31,30 +27,55 @@ pool.query('SELECT NOW()', (err, res) => {
 
 // -------------------- Routes --------------------
 
-// GET: Fetch data
-app.get('/api/data', async (req, res) => {
+//Fetch profile by ID
+app.get('/api/profile/:id', async (req, res) => {
+  const profileId = req.params.id;
+
   try {
-    const result = await pool.query('SELECT id, name FROM demo');
-    res.json(result.rows);
+    const query = `
+        SELECT 
+          p.profile_id, 
+          p.name, 
+          p.reputation_points, 
+          array_to_json(p.languages) AS languages, 
+          array_agg(s.skill) AS skills
+        FROM skill_profile p
+        LEFT JOIN skill_listing s ON p.profile_id = s.profile_id
+        WHERE p.profile_id = $1
+        GROUP BY p.profile_id;
+    `;
+
+    const result = await pool.query(query, [profileId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error('Database error (GET /api/data):', err.stack);
+    console.error('Database error (GET /api/profile/:id):', err.stack);
     res.status(500).send('Server error');
   }
 });
 
-// POST: Insert data
-app.post('/api/data', async (req, res) => {
-  const { name } = req.body;
-
-  if (!name || typeof name !== 'string' || name.trim() === '') {
-    return res.status(400).send('Invalid input');
-  }
-
+//Fetch multiple profiles
+app.get('/api/profiles', async (req, res) => {
   try {
-    await pool.query('INSERT INTO demo (name) VALUES ($1)', [name.trim()]);
-    res.send('Inserted');
+    const result = await pool.query(`
+      SELECT 
+        p.profile_id,
+        p.name,
+        p.reputation_points,
+        array_to_json(p.languages) AS languages,
+        array_agg(s.skill) AS skills
+      FROM skill_profile p
+      LEFT JOIN skill_listing s ON p.profile_id = s.profile_id
+      GROUP BY p.profile_id
+      LIMIT 4;
+    `);
+    res.json(result.rows);
   } catch (err) {
-    console.error('Database error (POST /api/data):', err.stack);
+    console.error('Error fetching profiles:', err);
     res.status(500).send('Server error');
   }
 });

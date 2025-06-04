@@ -6,9 +6,11 @@ const STATIC_FILES = [
   '/',
   '/index.html',
   '/app.js',
+  '/styles2.css',
   '/manifest.json',
   '/favicon.ico'
 ];
+
 
 // ------------------ Install Event ------------------
 self.addEventListener('install', (event) => {
@@ -60,15 +62,19 @@ self.addEventListener('fetch', (event) => {
 // ------------------ API Request Handler ------------------
 async function handleApiRequest(request) {
   const cache = await caches.open(API_CACHE);
-  try {
-    const response = await fetch(request);
-    cache.put(request, response.clone());
-    return response;
-  } catch (err) {
-    console.warn('[Service Worker] API fetch failed, serving from cache:', err);
-    const cachedResponse = await cache.match(request);
-    return cachedResponse || new Response('Offline', { status: 503 });
-  }
+  const cachedResponse = await cache.match(request);
+
+  const fetchPromise = fetch(request)
+    .then(networkResponse => {
+      cache.put(request, networkResponse.clone());
+      return networkResponse;
+    })
+    .catch(err => {
+      console.warn('[Service Worker] API fetch failed, using cache:', err);
+      return cachedResponse;
+    });
+
+  return cachedResponse || fetchPromise.catch(() => new Response('Offline', { status: 503 }));
 }
 
 // ------------------ Static Request Handler ------------------
