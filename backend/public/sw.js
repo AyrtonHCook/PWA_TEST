@@ -1,4 +1,7 @@
-const CACHE_NAME = 'pwa-cache-v2';
+const CACHE_VERSION = 'v2';
+const STATIC_CACHE = `static-cache-${CACHE_VERSION}`;
+const API_CACHE = `api-cache-${CACHE_VERSION}`;
+
 const STATIC_FILES = [
   '/',
   '/index.html',
@@ -7,48 +10,69 @@ const STATIC_FILES = [
   '/favicon.ico'
 ];
 
+// ------------------ Install Event ------------------
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing...');
   event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
+    caches.open(STATIC_CACHE).then(async (cache) => {
       for (const url of STATIC_FILES) {
         try {
           await cache.add(url);
-          console.log(`[Service Worker] Cached static: ${url}`);
+          console.log(`[Service Worker] Cached static file: ${url}`);
         } catch (err) {
-          console.warn(`[Service Worker] Failed to cache static: ${url}`, err);
+          console.warn(`[Service Worker] Failed to cache: ${url}`, err);
         }
       }
     })
   );
 });
 
+// ------------------ Activate Event ------------------
+self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Activating...');
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys
+          .filter(key => key !== STATIC_CACHE && key !== API_CACHE)
+          .map(key => caches.delete(key))
+      );
+    })
+  );
+});
+
+// ------------------ Fetch Event ------------------
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
   // Handle API GET requests
   if (requestUrl.pathname.startsWith('/api/') && event.request.method === 'GET') {
-    event.respondWith(
-      caches.open('api-cache').then(async (cache) => {
-        try {
-          const response = await fetch(event.request);
-          cache.put(event.request, response.clone());
-          return response;
-        } catch (err) {
-          console.warn('API fetch failed, using cache', err);
-          return cache.match(event.request);
-        }
-      })
-    );
-    return; // IMPORTANT: exit early if handled
+    event.respondWith(handleApiRequest(event.request));
+    return;
   }
 
-  // Handle all other static GET requests
+  // Handle all other GET requests (static assets)
   if (event.request.method === 'GET') {
-    event.respondWith(
-      caches.match(event.request).then(response => {
-        return response || fetch(event.request);
-      })
-    );
+    event.respondWith(handleStaticRequest(event.request));
   }
 });
+
+// ------------------ API Request Handler ------------------
+async function handleApiRequest(request) {
+  const cache = await caches.open(API_CACHE);
+  try {
+    const response = await fetch(request);
+    cache.put(request, response.clone());
+    return response;
+  } catch (err) {
+    console.warn('[Service Worker] API fetch failed, serving from cache:', err);
+    const cachedResponse = await cache.match(request);
+    return cachedResponse || new Response('Offline', { status: 503 });
+  }
+}
+
+// ------------------ Static Request Handler ------------------
+async function handleStaticRequest(request) {
+  const cachedResponse = await caches.match(request);
+  return cachedResponse || fetch(request);
+}
